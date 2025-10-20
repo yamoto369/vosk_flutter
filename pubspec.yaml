@@ -19,7 +19,7 @@ dependencies:
   package_config: ^2.1.0
   path: ^1.9.0
   path_provider: ^2.1.4
-  permission_handler: ^11.3.1
+  permission_handler: ^11.0.1
   pubspec_parse: ^1.3.0
 
 dev_dependencies:
@@ -34,10 +34,10 @@ dev_dependencies:
 
 ffigen:
   name: VoskLibrary
-  output: 'lib/src/generated_vosk_bindings.dart'
+  output: "lib/src/generated_vosk_bindings.dart"
   headers:
     entry-points:
-      - 'vosk-api/src/vosk_api.h'
+      - "vosk-api/src/vosk_api.h"
 
 flutter:
   plugin:
