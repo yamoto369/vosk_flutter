@@ -9,6 +9,16 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+/// Callback for download progress updates.
+/// [downloaded] is the number of bytes downloaded so far.
+/// [total] is the total number of bytes to download (-1 if unknown).
+/// [progress] is the download progress as a value between 0.0 and 1.0 (-1 if unknown).
+typedef DownloadProgressCallback = void Function(
+  int downloaded,
+  int total,
+  double progress,
+);
+
 /// A utility class for loading models from the assets or the internet.
 /// Models are loaded in separate isolates.
 class ModelLoader {
@@ -65,9 +75,16 @@ class ModelLoader {
   ///
   /// Tip: you can get a  [LanguageModelDescription] via [loadModelsList]
   /// and use [LanguageModelDescription.url].
+  ///
+  /// [onProgress] is an optional callback that will be called periodically
+  /// with the download progress. The callback receives:
+  /// - `downloaded`: bytes downloaded so far
+  /// - `total`: total bytes to download (-1 if unknown)
+  /// - `progress`: progress as 0.0-1.0 (-1 if unknown)
   Future<String> loadFromNetwork(
     String modelUrl, {
     bool forceReload = false,
+    DownloadProgressCallback? onProgress,
   }) async {
     final modelName = path.basenameWithoutExtension(modelUrl);
     if (!forceReload && await isModelAlreadyLoaded(modelName)) {
@@ -78,9 +95,7 @@ class ModelLoader {
 
     final start = DateTime.now();
 
-    final bytes = await httpClient
-        .get(Uri.parse(modelUrl))
-        .then((response) => response.bodyBytes);
+    final bytes = await _downloadWithProgress(modelUrl, onProgress);
 
     final decompressionPath = await _extractModel(bytes);
     final decompressedModelRoot = path.join(decompressionPath, modelName);
@@ -91,6 +106,31 @@ class ModelLoader {
     );
 
     return decompressedModelRoot;
+  }
+
+  /// Download file from URL with progress tracking.
+  Future<Uint8List> _downloadWithProgress(
+    String url,
+    DownloadProgressCallback? onProgress,
+  ) async {
+    final request = http.Request('GET', Uri.parse(url));
+    final response = await httpClient.send(request);
+
+    final contentLength = response.contentLength ?? -1;
+    final bytes = <int>[];
+    var downloaded = 0;
+
+    await for (final chunk in response.stream) {
+      bytes.addAll(chunk);
+      downloaded += chunk.length;
+
+      if (onProgress != null) {
+        final progress = contentLength > 0 ? downloaded / contentLength : -1.0;
+        onProgress(downloaded, contentLength, progress);
+      }
+    }
+
+    return Uint8List.fromList(bytes);
   }
 
   /// Load a list of all available models from the vosk lib web page.
